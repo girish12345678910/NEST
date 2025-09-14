@@ -1,18 +1,11 @@
 import React from 'react';
-import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, User, MessageCircle, Search, LogOut } from 'lucide-react';
-import { authService } from '../../services/authService';
-
+import { UserButton, useUser } from '@clerk/clerk-react';
 
 const Layout: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const user = authService.getCurrentUser();
-
-  const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
-  };
+  const { user } = useUser();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -22,7 +15,7 @@ const Layout: React.FC = () => {
       <nav className="bg-gray-900 border-b border-gray-700 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link 
-            to="/" 
+            to="/app" 
             className="text-transparent bg-gradient-to-r from-gray-300 to-gray-500 bg-clip-text text-2xl font-bold hover:from-white hover:to-gray-300 transition-all"
           >
             NEST
@@ -31,9 +24,9 @@ const Layout: React.FC = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <Link 
-              to="/" 
+              to="/app" 
               className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                isActive('/') 
+                isActive('/app') 
                   ? 'bg-gray-800 text-white' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
@@ -43,9 +36,9 @@ const Layout: React.FC = () => {
             </Link>
             
             <Link 
-              to="/explore" 
+              to="/app/explore" 
               className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                isActive('/explore') 
+                isActive('/app/explore') 
                   ? 'bg-gray-800 text-white' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
@@ -55,9 +48,9 @@ const Layout: React.FC = () => {
             </Link>
 
             <Link 
-              to="/messages" 
+              to="/app/messages" 
               className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                isActive('/messages') 
+                isActive('/app/messages') 
                   ? 'bg-gray-800 text-white' 
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
@@ -66,35 +59,39 @@ const Layout: React.FC = () => {
               <span>Messages</span>
             </Link>
 
-            {user && (
-              <Link 
-                to={`/profile/${user.username}`}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                  location.pathname.startsWith('/profile') 
-                    ? 'bg-gray-800 text-white' 
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
-              >
-                <User size={20} />
-                <span>Profile</span>
-              </Link>
-            )}
+            <Link 
+              to="/app/profile"
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                location.pathname.startsWith('/app/profile') 
+                  ? 'bg-gray-800 text-white' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <User size={20} />
+              <span>Profile</span>
+            </Link>
           </div>
 
-          {/* User Menu */}
+          {/* User Menu with Clerk */}
           <div className="flex items-center space-x-3">
-            {user && (
-              <div className="text-gray-300 text-sm">
-                Welcome, {user.displayName || user.username}!
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 text-gray-400 hover:text-red-400 transition-colors px-3 py-2 rounded-full hover:bg-gray-800"
-            >
-              <LogOut size={18} />
-              <span>Logout</span>
-            </button>
+            <div className="text-gray-300 text-sm hidden sm:block">
+              Welcome, {user?.firstName || user?.username}!
+            </div>
+            <UserButton 
+              appearance={{
+                
+                elements: {
+                  avatarBox: 'w-8 h-8',
+                  userButtonPopoverCard: 'bg-gray-900 border border-gray-700',
+                  userButtonPopoverActions: 'bg-gray-900',
+                  userButtonPopoverActionButton: 'text-gray-300 hover:text-white hover:bg-gray-800',
+                  userButtonPopoverActionButtonText: 'text-gray-300',
+                  userButtonPopoverFooter: 'bg-gray-800 border-t border-gray-700',
+                }
+              }}
+              userProfileMode="navigation"
+              userProfileUrl="/app/profile"
+            />
           </div>
         </div>
       </nav>
@@ -103,7 +100,6 @@ const Layout: React.FC = () => {
       <main className="max-w-6xl mx-auto">
         <Outlet />
       </main>
-      
     </div>
   );
 };

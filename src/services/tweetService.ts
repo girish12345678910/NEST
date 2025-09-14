@@ -1,25 +1,35 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+let currentToken: string | null = null;
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
 });
 
-// Add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('nest_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (currentToken) {
+      config.headers.Authorization = `Bearer ${currentToken}`;
+      console.log('API REQUEST with token:', config.method?.toUpperCase(), config.url);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Updated Tweet interfaces to match backend
+api.interceptors.response.use(
+  (response) => {
+    console.log('API SUCCESS:', response.config.method?.toUpperCase(), response.config.url, response.status);
+    return response;
+  },
+  (error) => {
+    console.error('API ERROR:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+    return Promise.reject(error);
+  }
+);
+
 export interface Author {
   id: string;
   username: string;
@@ -65,16 +75,15 @@ export interface CreateTweetRequest {
 }
 
 class TweetService {
+  setToken(token: string | null) {
+    currentToken = token;
+    console.log('TOKEN SET:', token ? 'YES' : 'NO');
+  }
+
   async createTweet(tweetData: CreateTweetRequest): Promise<OriginalTweet> {
-    try {
-      console.log('TweetService.createTweet called with:', tweetData);
-      const response = await api.post('/tweets', tweetData);
-      console.log('Tweet creation response:', response.data);
-      return response.data.data.tweet;
-    } catch (error) {
-      console.error('TweetService.createTweet error:', error);
-      throw error;
-    }
+    console.log('CREATING TWEET:', tweetData);
+    const response = await api.post('/tweets', tweetData);
+    return response.data.data.tweet;
   }
 
   async getTweets(page = 1, limit = 20): Promise<{ tweets: Tweet[], pagination: any }> {
@@ -82,6 +91,7 @@ class TweetService {
     return response.data.data;
   }
 
+  // ADD MISSING METHODS
   async getTimeline(page = 1, limit = 20): Promise<{ tweets: Tweet[], pagination: any }> {
     const response = await api.get(`/tweets?page=${page}&limit=${limit}`);
     return response.data.data;
@@ -98,27 +108,23 @@ class TweetService {
   }
 
   async likeTweet(tweetId: string): Promise<void> {
-    console.log('TweetService.likeTweet called for:', tweetId);
-    const response = await api.post(`/tweets/${tweetId}/like`);
-    console.log('Like API response:', response.data);
+    console.log('LIKE TWEET API CALL:', tweetId);
+    await api.post(`/tweets/${tweetId}/like`);
   }
 
   async unlikeTweet(tweetId: string): Promise<void> {
-    console.log('TweetService.unlikeTweet called for:', tweetId);
-    const response = await api.delete(`/tweets/${tweetId}/like`);
-    console.log('Unlike API response:', response.data);
+    console.log('UNLIKE TWEET API CALL:', tweetId);
+    await api.delete(`/tweets/${tweetId}/like`);
   }
 
   async retweetTweet(tweetId: string): Promise<void> {
-    console.log('TweetService.retweetTweet called for:', tweetId);
-    const response = await api.post(`/tweets/${tweetId}/retweet`);
-    console.log('Retweet API response:', response.data);
+    console.log('RETWEET API CALL:', tweetId);
+    await api.post(`/tweets/${tweetId}/retweet`);
   }
 
   async unretweetTweet(tweetId: string): Promise<void> {
-    console.log('TweetService.unretweetTweet called for:', tweetId);
-    const response = await api.delete(`/tweets/${tweetId}/retweet`);
-    console.log('Unretweet API response:', response.data);
+    console.log('UNRETWEET API CALL:', tweetId);
+    await api.delete(`/tweets/${tweetId}/retweet`);
   }
 
   async deleteTweet(tweetId: string): Promise<void> {

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { Send, Image, Smile, X, FileText } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { tweetService, CreateTweetRequest } from '../services/tweetService';
@@ -11,6 +12,7 @@ interface TweetComposerProps {
 
 const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSuccess }) => {
   const [tweet, setTweet] = useState('');
+  const { getToken } = useAuth();
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [error, setError] = useState('');
@@ -20,8 +22,22 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
   const maxLength = 280;
 
   const createTweetMutation = useMutation({
-    mutationFn: (data: CreateTweetRequest) => {
+    mutationFn: async (data: CreateTweetRequest) => {
       console.log('Creating tweet with data:', data);
+      
+      // Get Clerk token
+      const token = await getToken();
+      console.log('Got Clerk token for tweet creation:', token ? 'Token available' : 'No token');
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Set token for this request
+      if (tweetService.setToken) {
+        tweetService.setToken(token);
+      }
+      
       return tweetService.createTweet(data);
     },
     onSuccess: (data) => {
@@ -30,14 +46,23 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
       setMediaFiles([]);
       setIsExpanded(false);
       setError('');
+      
       // Invalidate and refetch tweets
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
       queryClient.invalidateQueries({ queryKey: ['tweets'] });
+      
       onSuccess?.();
     },
     onError: (error: any) => {
       console.error('Failed to create tweet:', error);
-      setError(error.response?.data?.message || 'Failed to create tweet. Please try again.');
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create tweet. Please try again.';
+      setError(errorMessage);
+      
+      // Auto-clear error after 5 seconds
+      setTimeout(() => {
+        setError('');
+      }, 5000);
     }
   });
 
@@ -76,14 +101,21 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
     <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-6">
       {/* Show error message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/20 border border-red-500 text-red-400 rounded-lg text-sm">
-          {error}
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-500 text-red-400 rounded-lg text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            onClick={() => setError('')}
+            className="ml-2 text-red-300 hover:text-red-100"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
       {/* Show loading state */}
       {createTweetMutation.isPending && (
-        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500 text-blue-400 rounded-lg text-sm">
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500 text-blue-400 rounded-lg text-sm flex items-center">
+          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2" />
           Creating your tweet...
         </div>
       )}
@@ -112,6 +144,7 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
               className="w-full bg-transparent text-gray-200 text-xl placeholder-gray-500 border-none resize-none focus:outline-none"
               rows={isExpanded ? 4 : 2}
               maxLength={maxLength + 20}
+              disabled={createTweetMutation.isPending}
             />
             
             {/* Media Preview */}
@@ -123,6 +156,7 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
                       type="button"
                       onClick={() => removeMedia(index)}
                       className="absolute -top-2 -right-2 bg-gray-700 rounded-full p-1 hover:bg-gray-600"
+                      disabled={createTweetMutation.isPending}
                     >
                       <X size={14} />
                     </button>
@@ -151,8 +185,9 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={mediaFiles.length >= 4}
+                    disabled={mediaFiles.length >= 4 || createTweetMutation.isPending}
                     className="text-gray-400 hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors p-2 rounded-full hover:bg-gray-800"
+                    title="Add media (images/videos)"
                   >
                     <Image size={20} />
                   </button>
@@ -160,6 +195,8 @@ const TweetComposer: React.FC<TweetComposerProps> = ({ replyTo, quoteTweet, onSu
                   <button
                     type="button"
                     className="text-gray-400 hover:text-yellow-400 transition-colors p-2 rounded-full hover:bg-gray-800"
+                    disabled={createTweetMutation.isPending}
+                    title="Add emoji"
                   >
                     <Smile size={20} />
                   </button>
