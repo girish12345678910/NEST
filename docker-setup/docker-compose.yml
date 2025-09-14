@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  nest-postgres:
+    image: postgres:15
+    container_name: nest-db
+    restart: always
+    environment:
+      POSTGRES_DB: nest_db
+      POSTGRES_USER: nest_user
+      POSTGRES_PASSWORD: nest_password_2024
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - nest_postgres_data:/var/lib/postgresql/data/pgdata
+      - ./init-nest-db.sql:/docker-entrypoint-initdb.d/init-nest-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nest_user -d nest_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nest-network
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nest-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nest.com
+      PGADMIN_DEFAULT_PASSWORD: nestadmin2024
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - nest-network
+    depends_on:
+      - nest-postgres
+
+volumes:
+  nest_postgres_data:
+  pgadmin_data:
+
+networks:
+  nest-network:
+    driver: bridge
